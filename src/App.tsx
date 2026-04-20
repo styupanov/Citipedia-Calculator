@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart3, 
@@ -68,8 +68,9 @@ const fmt = (n: number) => {
   if (!isFinite(n)) return '∞';
   const a = Math.abs(n);
   const sign = n < 0 ? '−' : '';
-  if (a >= 1000000) return sign + (a / 1000000).toFixed(a % 1000000 < 100000 ? 0 : 1).replace('.0', '') + ' млн ₸';
-  return sign + Math.round(a).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ₸';
+  // Используем пробел как разделитель тысяч для всех чисел
+  const formatted = Math.round(a).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return sign + formatted + ' ₸';
 };
 
 const fmtShort = (n: number) => {
@@ -78,7 +79,7 @@ const fmtShort = (n: number) => {
   const sign = n < 0 ? '−' : '';
   if (a >= 1000000) return sign + (a / 1000000).toFixed(a % 1000000 < 100000 ? 0 : 1).replace('.0', '') + ' млн';
   if (a >= 10000) return sign + (a / 1000).toFixed(0) + ' тыс';
-  return sign + Math.round(a).toLocaleString('ru-RU').replace(/,/g, ' ');
+  return sign + Math.round(a).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 };
 
 export default function App() {
@@ -113,10 +114,10 @@ export default function App() {
 
   const [expandedSections, setExpandedSections] = useState({
     rev: true,
-    rent: true,
-    var: true,
-    pay: true,
-    tax: true
+    rent: false,
+    var: false,
+    pay: false,
+    tax: false
   });
 
   // -- Actions --
@@ -308,11 +309,9 @@ export default function App() {
             >
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Средний чек" unit="₸" tip="Средняя сумма одной покупки с учётом всех позиций">
-                  <input 
-                    type="number" 
+                  <NumericInput 
                     value={check} 
-                    onChange={e => setCheck(+e.target.value)}
-                    className="input-field" 
+                    onChange={setCheck}
                   />
                   <MarketHints range={PRESETS[currentPresetKey].checkRange} unit="₸" onSelect={setCheck} isMoney />
                 </Field>
@@ -367,11 +366,9 @@ export default function App() {
                   <MarketHints range={PRESETS[currentPresetKey].areaRange} unit="м²" onSelect={setArea} />
                 </Field>
                 <Field label="Ставка аренды" unit="₸/м²" tip="Базовая арендная ставка за 1 м². НДС и ОРЕ — отдельно ниже">
-                  <input 
-                    type="number" 
+                  <NumericInput 
                     value={rentBase} 
-                    onChange={e => setRentBase(+e.target.value)}
-                    className="input-field" 
+                    onChange={setRentBase}
                   />
                   <MarketHints range={PRESETS[currentPresetKey].rentRange} unit="₸/м²" onSelect={setRentBase} isMoney />
                 </Field>
@@ -421,7 +418,7 @@ export default function App() {
                   <MarketHints range={PRESETS[currentPresetKey].staffRange} unit="чел" onSelect={setStaff} />
                 </Field>
                 <Field label="ЗП на руки" unit="₸" tip="Чистая зарплата сотрудника. Налоги к ней добавятся автоматически (~22%)">
-                  <input type="number" value={salaryNet} onChange={e => setSalaryNet(+e.target.value)} className="input-field" />
+                  <NumericInput value={salaryNet} onChange={setSalaryNet} />
                   <MarketHints range={PRESETS[currentPresetKey].salaryRange} unit="₸" onSelect={setSalaryNet} isMoney />
                 </Field>
               </div>
@@ -457,11 +454,11 @@ export default function App() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="CAPEX" unit="₸" tip="Ремонт, оборудование, мебель, вывеска, оформление ИП/ТОО">
-                  <input type="number" value={capex} onChange={e => setCapex(+e.target.value)} className="input-field" />
+                  <NumericInput value={capex} onChange={setCapex} />
                   <MarketHints range={PRESETS[currentPresetKey].capexRange} unit="₸" onSelect={setCapex} isMoney />
                 </Field>
                 <Field label="Оборотка" unit="₸" tip="Депозит за аренду + запас товара + подушка на первые месяцы">
-                  <input type="number" value={wc} onChange={e => setWc(+e.target.value)} className="input-field" />
+                  <NumericInput value={wc} onChange={setWc} />
                   <span className="text-[10px] text-gray-600 mt-1">Депозит + товар + 2–3 мес подушки</span>
                 </Field>
               </div>
@@ -624,13 +621,40 @@ function Field({ label, unit, tip, children }: any) {
         )}
       </label>
       <div className="relative">
-        {children[0]}
+        {Array.isArray(children) ? children[0] : children}
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-600 pointer-events-none uppercase">
           {unit}
         </span>
       </div>
-      {children[1]}
+      {Array.isArray(children) && children[1]}
     </div>
+  );
+}
+
+function NumericInput({ value, onChange }: { value: number, onChange: (v: number) => void }) {
+  const [displayValue, setDisplayValue] = useState(value === 0 ? '' : value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
+  
+  useEffect(() => {
+    setDisplayValue(value === 0 ? '' : value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\s/g, '');
+    if (raw === '' || !isNaN(+raw)) {
+      const num = raw === '' ? 0 : +raw;
+      onChange(num);
+      // Immediately format the input value for visual feedback
+      setDisplayValue(raw.replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
+    }
+  };
+
+  return (
+    <input 
+      type="text" 
+      value={displayValue} 
+      onChange={handleChange}
+      className="input-field" 
+    />
   );
 }
 
