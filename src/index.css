@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --color-purple: #c026d3;
+  --color-pink: #e879f9;
+  --color-teal: #00c4aa;
+  --color-teal2: #00a896;
+  --color-surface: #161625;
+  --color-surface2: #1e1e30;
+  --color-surface3: #252540;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0f] text-white font-sans;
+  }
+}
+
+@layer components {
+  .input-field {
+    @apply w-full bg-surface2 border-[1.5px] border-white/5 rounded-xl px-3 py-2 text-sm font-mono font-medium outline-none transition-all duration-200;
+  }
+  .input-field:focus {
+    @apply border-teal bg-teal/5;
+  }
+  .input-field.err {
+    @apply border-red-500 bg-red-500/5;
+  }
+}
+
+@layer utilities {
+  .form-shadow {
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+}
+
+.text-gradient-teal {
+  background: linear-gradient(135deg, #00c4aa, #4adecc);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
