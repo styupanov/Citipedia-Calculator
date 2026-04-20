@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, animate } from 'motion/react';
 import { 
   BarChart3, 
   Home, 
@@ -25,7 +25,8 @@ import {
   Percent,
   Wallet,
   Scale,
-  Check
+  Check,
+  Plus
 } from 'lucide-react';
 import { PRESETS, Preset, BENCHMARKS } from './constants';
 
@@ -84,7 +85,6 @@ const fmtShort = (n: number) => {
 
 export default function App() {
   const [currentPresetKey, setCurrentPresetKey] = useState('coffee');
-  const [showResults, setShowResults] = useState(false);
   
   // -- Form States --
   const [area, setArea] = useState(PRESETS.coffee.area);
@@ -135,7 +135,6 @@ export default function App() {
     setSalaryNet(p.salary);
     setCapex(p.capex);
     setWc(p.wc);
-    // Optionally trigger calculation immediately
   };
 
   const toggleSection = (key: keyof typeof expandedSections) => {
@@ -235,11 +234,6 @@ export default function App() {
     return { rentPct, fotPct, ebitdaPct, totalInvest, payback, beRevenue, beClients, beCheck, safetyTraffic, opLeverage, score };
   }, [pnl, pnlRamp, capex, wc, cogsPct, acqPct, mktPct, options, check, days, clients, rampUp]);
 
-  const handleCalculate = () => {
-    setShowResults(true);
-    // Scroll to results would be here if needed
-  };
-
   return (
     <div className="min-h-screen pb-20">
       {/* --- Hero --- */}
@@ -269,7 +263,7 @@ export default function App() {
         <div className="bg-surface border border-white/10 rounded-2xl p-5 mb-6">
           <div className="flex items-center justify-between mb-4 px-2">
             <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Тип бизнеса</span>
-            <span className="text-[11px] font-mono text-gray-600">
+            <span className="text-[12px] font-mono font-semibold text-gray-500">
               {PRESETS[currentPresetKey].meta}
             </span>
           </div>
@@ -335,14 +329,12 @@ export default function App() {
                   />
                   <MarketHints range={PRESETS[currentPresetKey].daysRange} unit="дн" onSelect={setDays} />
                 </Field>
-                <Field label="Ramp-up (1-й год)" unit="%" tip="Новый бизнес выходит на плановую выручку постепенно. 75% — реалистично для первого года">
-                  <input 
-                    type="number" 
+                <Field label="Выход на план (1-й год)" unit="%" tip="Новый бизнес выходит на плановую выручку не сразу. 75% — реалистичный темп для первого года работы">
+                  <NumericInput 
                     value={rampUp} 
-                    onChange={e => setRampUp(+e.target.value)}
-                    className="input-field" 
+                    onChange={setRampUp}
                   />
-                  <span className="text-[10px] text-gray-600 mt-1">Применяется к окупаемости</span>
+                  <span className="text-[11px] text-gray-500 mt-1">Влияет на срок окупаемости</span>
                 </Field>
               </div>
             </Section>
@@ -383,23 +375,23 @@ export default function App() {
             {/* 3. Переменные */}
             <Section 
               title="Переменные расходы" 
-              subtitle="COGS, эквайринг, маркетинг" 
+              subtitle="Себестоимость, эквайринг, маркетинг" 
               icon={<DollarSign className="w-4 h-4 text-teal" />}
               isExpanded={expandedSections.var}
               onToggle={() => toggleSection('var')}
             >
               <div className="grid grid-cols-3 gap-3">
-                <Field label="COGS" unit="%" tip="Доля себестоимости товара/услуги в выручке (продукты, материалы)">
+                <Field label="Себестоимость" unit="%" tip="Доля себестоимости в выручке — продукты, материалы, товар на перепродажу">
                   <input type="number" value={cogsPct} onChange={e => setCogsPct(+e.target.value)} className="input-field" />
                   <MarketHints range={PRESETS[currentPresetKey].cogsRange} unit="%" onSelect={setCogsPct} />
                 </Field>
-                <Field label="Эквайринг" unit="%" tip="Средняя комиссия банка за приём карт. В Казахстане: 1.5–2.5%">
+                <Field label="Эквайринг" unit="%" tip="Комиссия банка за приём оплаты картой. В Казахстане обычно 1.5–2.5%">
                   <input type="number" value={acqPct} onChange={e => setAcqPct(+e.target.value)} className="input-field" />
-                  <span className="text-[10px] text-gray-600 mt-1">90%+ платят картой</span>
+                  <span className="text-[11px] text-gray-500 mt-1">90%+ платят картой</span>
                 </Field>
-                <Field label="Маркетинг" unit="%" tip="Реклама, SMM, акции. Для нового бизнеса 5–10% первый год">
+                <Field label="Маркетинг" unit="%" tip="Реклама, соцсети, акции. Для нового бизнеса в первый год — 5–10% от выручки">
                   <input type="number" value={mktPct} onChange={e => setMktPct(+e.target.value)} className="input-field" />
-                  <span className="text-[10px] text-gray-600 mt-1">Запуск: 7–10% · зрелый: 3–5%</span>
+                  <span className="text-[11px] text-gray-500 mt-1">Запуск: 7–10% · действующий: 3–5%</span>
                 </Field>
               </div>
             </Section>
@@ -430,13 +422,13 @@ export default function App() {
             {/* 5. Налоги */}
             <Section 
               title="Налоги и инвестиции" 
-              subtitle="Режим + CAPEX" 
+              subtitle="Режим + Вложения" 
               icon={<Home className="w-4 h-4 text-teal" />}
               isExpanded={expandedSections.tax}
               onToggle={() => toggleSection('tax')}
             >
               <div className="mb-4">
-                <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2 block">Налоговый режим</span>
+                <span className="text-[11px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Налоговый режим</span>
                 <div className="flex gap-2">
                   <ToggleBtn 
                     active={options.taxMode === 'simple'} 
@@ -453,119 +445,120 @@ export default function App() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="CAPEX" unit="₸" tip="Ремонт, оборудование, мебель, вывеска, оформление ИП/ТОО">
+                <Field label="Вложения (CAPEX)" unit="₸" tip="Ремонт, оборудование, мебель, вывеска, оформление ИП/ТОО">
                   <NumericInput value={capex} onChange={setCapex} />
                   <MarketHints range={PRESETS[currentPresetKey].capexRange} unit="₸" onSelect={setCapex} isMoney />
                 </Field>
                 <Field label="Оборотка" unit="₸" tip="Депозит за аренду + запас товара + подушка на первые месяцы">
                   <NumericInput value={wc} onChange={setWc} />
-                  <span className="text-[10px] text-gray-600 mt-1">Депозит + товар + 2–3 мес подушки</span>
+                  <span className="text-[11px] text-gray-500 mt-1">Депозит + товар + 2–3 мес подушки</span>
                 </Field>
               </div>
             </Section>
 
-            <button 
-              onClick={handleCalculate}
-              className="w-full mt-6 bg-gradient-to-br from-teal to-teal2 text-black font-black py-4 rounded-xl flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-teal/20"
-            >
-              <BarChart3 className="w-5 h-5" /> Рассчитать P&L и окупаемость
-            </button>
           </div>
 
           {/* --- Results --- */}
           <div className="flex flex-col gap-4 min-h-[600px]">
-            {!showResults ? (
-              <div className="flex-1 border-2 border-dashed border-white/10 rounded-[32px] flex flex-col items-center justify-center p-12 text-center text-gray-600 bg-surface/30 backdrop-blur-sm">
-                <motion.div
-                  animate={{ scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="w-20 h-20 bg-teal/5 rounded-full flex items-center justify-center mb-6 border border-teal/10"
-                >
-                  <TrendingUp className="w-10 h-10 text-teal opacity-30" />
-                </motion.div>
-                <h3 className="text-xl font-bold mb-2 text-gray-400">Готовы к расчету?</h3>
-                <p className="text-sm max-w-[280px]">Выберите тип бизнеса сверху или настройте параметры вручную для детального прогноза.</p>
+            <div className="space-y-8">
+              {/* 1. Verdict Headline */}
+              <HeadlineVerdict 
+                pnl={pnl} 
+                metrics={metrics} 
+                segment={currentPresetKey}
+                inputs={{ cogsPct }}
+              />
+              
+              {/* 2. Scoring Model (Collapsible) */}
+              <ScoringSection score={metrics.score} metrics={metrics} pnl={pnl} />
+              
+              {/* 3. KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <KPICard 
+                  title="EBITDA" 
+                  numericValue={pnl.ebitda} 
+                  isMoney 
+                  sub={`${metrics.ebitdaPct.toFixed(1)}% от выручки`}
+                  status={pnl.ebitda > 0 ? 'good' : 'bad'}
+                />
+                <KPICard 
+                  title="Чистая прибыль" 
+                  numericValue={pnl.net} 
+                  isMoney
+                  sub="После всех налогов"
+                  status={pnl.net > 0 ? 'success' : 'bad'}
+                />
+                <KPICard 
+                  title="Аренда / Выручка" 
+                  numericValue={metrics.rentPct} 
+                  suffix="%"
+                  sub="Норма: до 20%"
+                  status={metrics.rentPct < 15 ? 'good' : metrics.rentPct < 25 ? 'warn' : 'bad'}
+                />
+                <KPICard 
+                  title="ФОТ / Выручка" 
+                  numericValue={metrics.fotPct} 
+                  suffix="%"
+                  sub="Норма: до 30%"
+                  status={metrics.fotPct < 25 ? 'good' : metrics.fotPct < 35 ? 'warn' : 'bad'}
+                />
+                <KPICard 
+                  title="Окупаемость" 
+                  numericValue={isFinite(metrics.payback) ? metrics.payback : 0} 
+                  suffix={isFinite(metrics.payback) ? " мес" : "∞"}
+                  sub={`При выходе на план ${rampUp}%`}
+                  status={metrics.payback < 18 ? 'good' : metrics.payback < 36 ? 'warn' : 'bad'}
+                  isInfinite={!isFinite(metrics.payback)}
+                />
               </div>
-            ) : (
-              <div className="space-y-4">
-                {/* 1. Verdict Row */}
-                <div className="grid grid-cols-1 md:grid-cols-[1.4fr,1fr] gap-4">
-                  <VerdictCard score={metrics.score} pnl={pnl} metrics={metrics} />
-                  <GaugeCard score={metrics.score} />
-                </div>
-                
-                {/* 2. KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <KPICard title="Выручка" value={fmt(pnl.revenue)} sub={`${clients} × ${fmtShort(check)} × ${days}`} />
-                  <KPICard 
-                    title="EBITDA" 
-                    value={fmt(pnl.ebitda)} 
-                    sub={`${metrics.ebitdaPct.toFixed(1)}% от выручки`}
-                    status={pnl.ebitda > 0 ? 'good' : 'bad'}
-                  />
-                  <KPICard 
-                    title="Чистая прибыль" 
-                    value={fmt(pnl.net)} 
-                    sub="После всех налогов"
-                    status={pnl.net > 0 ? 'success' : 'bad'}
-                  />
-                  <KPICard 
-                    title="Аренда / Выручка" 
-                    value={`${metrics.rentPct.toFixed(1)}%`} 
-                    sub="Норма: до 20%"
-                    status={metrics.rentPct < 15 ? 'good' : metrics.rentPct < 25 ? 'warn' : 'bad'}
-                  />
-                  <KPICard 
-                    title="ФОТ / Выручка" 
-                    value={`${metrics.fotPct.toFixed(1)}%`} 
-                    sub="Норма: до 30%"
-                    status={metrics.fotPct < 25 ? 'good' : metrics.fotPct < 35 ? 'warn' : 'bad'}
-                  />
-                  <KPICard 
-                    title="Окупаемость" 
-                    value={isFinite(metrics.payback) ? `${Math.ceil(metrics.payback)} мес` : '∞'} 
-                    sub={`При ramp-up ${rampUp}%`}
-                    status={metrics.payback < 18 ? 'good' : metrics.payback < 36 ? 'warn' : 'bad'}
-                  />
-                </div>
 
-                {/* 3. Charts: Waterfall & CashFlow */}
-                <WaterfallCard pnl={pnl} />
-                <CashFlowCard pnl={pnl} capex={capex} wc={wc} rampUp={rampUp} />
+              {/* 3. Charts: Waterfall & CashFlow */}
+              <WaterfallCard pnl={pnl} />
+              <CashFlowCard pnl={pnl} capex={capex} wc={wc} rampUp={rampUp} />
 
-                {/* 4. P&L Table */}
-                <PnLTable pnl={pnl} inputs={{ cogsPct, acqPct, mktPct }} options={options} />
+              {/* 4. P&L Table */}
+              <PnLTable pnl={pnl} inputs={{ cogsPct, acqPct, mktPct }} options={options} />
 
-                {/* 5. Safety & Benchmarks */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <SafetyBars inputs={{ clients, check, cogsPct, acqPct, mktPct }} metrics={metrics} pnl={pnl} options={options} />
-                  <BenchmarksCard segment={currentPresetKey} metrics={metrics} />
-                </div>
-
-                {/* 6. Sensitivity */}
-                <SensitivityMatrix baseEbitda={pnl.ebitda} check={check} clients={clients} days={days} inputs={{ area, rentBase, cogsPct, acqPct, mktPct, staff, salaryNet, capex, wc }} options={options} />
-
-                {/* 7. Break Even */}
-                <BreakEvenCard metrics={metrics} pnl={pnl} check={check} clients={clients} days={days} />
-
-                {/* 8. Interpretations */}
-                <InterpretationsList metrics={metrics} pnl={pnl} />
-
-                {/* 9. CTA */}
-                <section className="bg-gradient-to-br from-purple/10 to-pink/5 border border-purple/20 rounded-3xl p-8 text-center sm:text-left flex flex-col sm:flex-row items-center gap-6">
-                  <div className="flex-1">
-                    <h4 className="text-xl font-black mb-2">{pnl.ebitda > 0 ? 'Найдите локацию, где эта модель сработает' : 'Найдите локацию с меньшей арендой и большим трафиком'}</h4>
-                    <p className="text-sm text-gray-400 mb-0">Citipedia покажет реальный трафик и конкурентов для любой точки Алматы. Найдите место, где эта модель принесет больше.</p>
-                  </div>
-                  <button className="bg-gradient-to-br from-purple to-pink px-8 py-4 rounded-xl font-black text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 transition-transform">
-                    К анализу локаций <ArrowRight className="w-4 h-4" />
-                  </button>
-                </section>
+              {/* 5. Safety & Benchmarks */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SafetyBars inputs={{ clients, check, cogsPct, acqPct, mktPct }} metrics={metrics} pnl={pnl} options={options} />
+                <BenchmarksCard segment={currentPresetKey} metrics={metrics} />
               </div>
-            )}
+
+              {/* 6. Sensitivity */}
+              <SensitivityMatrix 
+                baseEbitda={pnl.ebitda} 
+                check={check} 
+                clients={clients} 
+                days={days} 
+                inputs={{ area, rentBase, cogsPct, acqPct, mktPct, staff, salaryNet, capex, wc }} 
+                options={options}
+                setCheck={setCheck}
+                setClients={setClients}
+              />
+
+              {/* 7. Break Even */}
+              <BreakEvenCard metrics={metrics} pnl={pnl} check={check} clients={clients} days={days} />
+
+              {/* 8. Interpretations */}
+              <InterpretationsList metrics={metrics} pnl={pnl} />
+
+              {/* 9. CTA */}
+              <section className="bg-gradient-to-br from-teal/10 to-teal2/5 border border-teal/20 rounded-3xl p-8 text-center sm:text-left flex flex-col sm:flex-row items-center gap-6">
+                <div className="flex-1">
+                  <h4 className="text-xl font-black mb-2">{pnl.ebitda > 0 ? 'Найдите локацию, где эта модель сработает' : 'Найдите локацию с меньшей арендой и большим трафиком'}</h4>
+                  <p className="text-sm text-gray-400 mb-0">Citipedia покажет реальный трафик и конкурентов для любой точки Алматы. Найдите место, где эта модель принесет больше.</p>
+                </div>
+                <button className="bg-gradient-to-br from-teal to-teal2 px-8 py-4 rounded-xl font-black text-black text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 transition-transform">
+                  К анализу локаций <ArrowRight className="w-4 h-4" />
+                </button>
+              </section>
+            </div>
           </div>
         </div>
       </main>
+
+      <StickyMobileBar pnl={pnl} metrics={metrics} />
     </div>
   );
 }
@@ -585,7 +578,7 @@ function Section({ title, subtitle, icon, children, isExpanded, onToggle }: any)
           </div>
           <div>
             <h4 className="text-sm font-black tracking-tight">{title}</h4>
-            <p className="text-[10px] text-gray-500">{subtitle}</p>
+            <p className="text-[11px] text-gray-500">{subtitle}</p>
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${!isExpanded ? '-rotate-90' : ''}`} />
@@ -609,12 +602,12 @@ function Section({ title, subtitle, icon, children, isExpanded, onToggle }: any)
 function Field({ label, unit, tip, children }: any) {
   return (
     <div className="flex flex-col gap-1.5 flex-1">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+      <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 flex items-center gap-1.5">
         {label} 
         {tip && (
           <div className="group relative">
             <Info className="w-3 h-3 opacity-30 cursor-help" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface3 border border-white/10 p-2 rounded-lg text-[10px] text-gray-300 font-medium invisible group-hover:visible transition-all shadow-xl z-50">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-surface3 border border-white/10 p-3 rounded-lg text-[12px] text-gray-300 font-medium leading-relaxed invisible group-hover:visible transition-all shadow-xl z-50">
               {tip}
             </div>
           </div>
@@ -622,7 +615,7 @@ function Field({ label, unit, tip, children }: any) {
       </label>
       <div className="relative">
         {Array.isArray(children) ? children[0] : children}
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-600 pointer-events-none uppercase">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-gray-500 pointer-events-none">
           {unit}
         </span>
       </div>
@@ -672,16 +665,12 @@ function MarketHints({ range, unit, onSelect, isMoney }: any) {
 
   return (
     <div className="flex gap-1.5 mt-1.5">
-      <span className="text-[9px] text-gray-600 self-center">Рынок:</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 self-center">Рынок:</span>
       {[lo, mid, hi].map((v, i) => (
         <button 
           key={i} 
           onClick={() => onSelect(v)}
-          className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold transition-colors ${
-            i === 0 ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 
-            i === 1 ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 
-            'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-          }`}
+          className="px-2 py-0.5 rounded-lg text-[12px] font-mono font-semibold transition-all bg-surface2 text-gray-400 hover:text-white hover:bg-surface3 border border-white/5"
         >
           {format(v)}
         </button>
@@ -694,13 +683,13 @@ function ToggleBtn({ active, onClick, children }: any) {
   return (
     <button 
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-2 border ${
+      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 border ${
         active 
           ? 'bg-teal/10 border-teal/40 text-teal shadow-sm shadow-teal/5' 
           : 'bg-surface2 border-white/5 text-gray-500 hover:text-gray-300'
       }`}
     >
-      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${active ? 'border-teal bg-teal text-black' : 'border-current'}`}>
+      <div className={`w-3.5 h-3.5 rounded-lg flex items-center justify-center border transition-colors ${active ? 'border-teal bg-teal text-black' : 'border-current'}`}>
         {active && <Check className="w-2.5 h-2.5 stroke-[4px]" />}
       </div>
       {children}
@@ -708,63 +697,230 @@ function ToggleBtn({ active, onClick, children }: any) {
   );
 }
 
-function KPICard({ title, value, sub, status }: any) {
-  const colorClass = status === 'good' ? 'text-teal' : status === 'success' ? 'text-emerald-400' : status === 'warn' ? 'text-amber-400' : status === 'bad' ? 'text-red-400' : 'text-white';
+function KPICard({ title, numericValue, sub, status, isMoney, suffix = '', isInfinite }: any) {
+  const [displayValue, setDisplayValue] = useState(numericValue);
+  const prevValueRef = useRef(numericValue);
+  const [delta, setDelta] = useState<number | null>(null);
+  const [showDelta, setShowDelta] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (numericValue !== prevValueRef.current) {
+      // Delta logic
+      const diff = numericValue - prevValueRef.current;
+      const pct = prevValueRef.current !== 0 ? (diff / Math.abs(prevValueRef.current)) * 100 : 100;
+      setDelta(pct);
+      setShowDelta(true);
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setShowDelta(false), 1500);
+
+      // Debounce & Animation logic
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        animate(prevValueRef.current, numericValue, {
+          duration: 0.3,
+          ease: "easeOut",
+          onUpdate: (latest) => setDisplayValue(latest)
+        });
+        prevValueRef.current = numericValue;
+      }, 150);
+    }
+  }, [numericValue]);
+
+  const colorClass = (status === 'good' || status === 'success') ? 'text-emerald-400' : status === 'brand' ? 'text-teal' : status === 'warn' ? 'text-amber-400' : status === 'bad' ? 'text-red-400' : 'text-white';
+  
+  const formattedValue = isInfinite ? '∞' : isMoney ? fmt(displayValue) : (Math.round(displayValue * 10) / 10).toString() + suffix;
+
   return (
-    <div className="bg-surface border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
-      <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">{title}</span>
-      <div className={`text-lg font-mono font-black ${colorClass}`}>{value}</div>
-      <span className="text-[9px] text-gray-600 truncate">{sub}</span>
+    <div className="bg-surface border border-white/5 rounded-2xl p-4 flex flex-col gap-1 relative overflow-hidden transition-all">
+      <div className="flex justify-between items-center h-4">
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">{title}</span>
+        <AnimatePresence>
+          {showDelta && delta !== null && delta !== 0 && (
+            <motion.span
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className={`text-[11px] font-bold ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}
+            >
+              {delta > 0 ? '↗' : '↘'} {delta > 0 ? '+' : ''}{delta.toFixed(1)}%
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+      <div className={`text-lg font-mono font-bold ${colorClass}`}>
+        {formattedValue}
+      </div>
+      <span className="text-[11px] text-gray-500 truncate">{sub}</span>
     </div>
   );
 }
 
-function VerdictCard({ score, pnl, metrics }: any) {
+function StickyMobileBar({ pnl, metrics }: { pnl: PnLResult, metrics: any }) {
+  return (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface/90 backdrop-blur-md border-t border-white/10 z-[200] px-6 flex items-center justify-between pointer-events-none">
+      <div className="flex flex-col">
+        <span className="text-[11px] uppercase font-bold text-gray-500 tracking-[0.14em]">EBITDA</span>
+        <span className={`text-[12px] font-mono font-semibold ${pnl.ebitda > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {pnl.ebitda > 0 ? '+' : ''}{fmt(pnl.ebitda)}
+        </span>
+      </div>
+      <div className="flex flex-col text-right">
+        <span className="text-[11px] uppercase font-bold text-gray-500 tracking-[0.14em]">Окупаемость</span>
+        <span className={`text-[12px] font-mono font-semibold ${metrics.payback < 24 ? 'text-emerald-400' : 'text-amber-400'}`}>
+          {isFinite(metrics.payback) ? `${Math.ceil(metrics.payback)} мес` : '∞'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HeadlineVerdict({ pnl, metrics, segment, inputs }: { pnl: PnLResult, metrics: any, segment: string, inputs: any }) {
+  const safety = metrics.safetyTraffic;
+  const payback = metrics.payback;
+  const ebitda = pnl.ebitda;
+  const net = pnl.net;
+
   let mode: 'good' | 'warn' | 'bad' = 'warn';
-  if (pnl.ebitda <= 0) mode = 'bad';
-  else if (score >= 70) mode = 'good';
-  else if (score < 45) mode = 'bad';
+  if (ebitda <= 0) mode = 'bad';
+  else if (metrics.score >= 70) mode = 'good';
+  else if (metrics.score < 45) mode = 'bad';
 
   const config = {
-    good: { icon: <CheckCircle2 className="w-10 h-10 text-emerald-400" />, title: 'Устойчивая модель', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-    warn: { icon: <Clock className="w-10 h-10 text-amber-400" />, title: 'Рабочая, но уязвимая', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-    bad: { icon: <AlertCircle className="w-10 h-10 text-red-500" />, title: pnl.ebitda <= 0 ? 'Бизнес не окупится' : 'Высокий риск', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+    good: { marker: '✓ УСТОЙЧИВАЯ МОДЕЛЬ', color: 'text-emerald-400', border: 'border-emerald-500' },
+    warn: { marker: '⚠ УЯЗВИМАЯ МОДЕЛЬ', color: 'text-amber-400', border: 'border-amber-500' },
+    bad: { marker: '✕ ВЫСОКИЙ РИСК', color: 'text-red-500', border: 'border-red-500' },
   }[mode];
+
+  const preset = PRESETS[segment];
+  const cogsMedian = (preset.cogsRange[0] + preset.cogsRange[1]) / 2;
+
+  const getRecommendation = () => {
+    if (ebitda <= 0) {
+      const neededFixedReduc = (Math.abs(ebitda) / pnl.fixedTotal * 100).toFixed(0);
+      const varRate = (pnl.variableTotal / pnl.revenue);
+      const margin = 1 - varRate;
+      const requiredRev = pnl.fixedTotal / margin;
+      const revGrowth = ((requiredRev - pnl.revenue) / pnl.revenue * 100).toFixed(0);
+      return `Операционная модель убыточна. Снизьте фикс-расходы (ФОТ или аренду) минимум на ${neededFixedReduc}%, либо пересмотрите чек/трафик — требуется рост выручки на ${revGrowth}%.`;
+    }
+    if (safety < 15) {
+      return `Модель рабочая, но при падении трафика на ${safety.toFixed(0)}% EBITDA уйдёт в ноль. Ищите локацию с большим трафиком или снижайте фикс-расходы.`;
+    }
+    if (safety >= 15 && safety <= 30) {
+      return `Модель здоровая. Для роста маржи — оптимизируйте себестоимость (текущий ${inputs.cogsPct}%, медиана по сегменту ${cogsMedian.toFixed(0)}%).`;
+    }
+    if (safety > 30 && payback < 24) {
+      return `Сильная инвестиционная модель. Рекомендуем искать локацию и запускать.`;
+    }
+    return `Модель прибыльна, но имеет потенциал для оптимизации переменных расходов.`;
+  };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={`rounded-[32px] p-10 border-t-8 shadow-2xl ${config.bg} ${config.border} flex flex-col items-center sm:flex-row sm:items-start gap-8 relative overflow-hidden backdrop-blur-sm`}
-      style={{ borderTopColor: mode === 'good' ? '#10b981' : mode === 'warn' ? '#f59e0b' : '#ef4444' }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`bg-surface border-t-4 ${config.border} rounded-3xl p-8 shadow-2xl flex flex-col gap-6`}
     >
-      <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
-        {config.icon}
+      <div className={`text-[11px] font-mono font-bold uppercase tracking-[0.2em] ${config.color}`}>
+        {config.marker}
       </div>
-      <div className="mt-1 flex-shrink-0">{config.icon}</div>
-      <div className="flex-1 text-center sm:text-left">
-        <h3 className={`text-3xl font-black mb-3 ${config.color} tracking-tight`}>{config.title}</h3>
-        <p className="text-gray-300 text-base leading-relaxed max-w-xl">
-          {mode === 'bad' && pnl.ebitda <= 0 
-            ? 'Прогноз отрицательный. При текущих вводных бизнес будет ежемесячно генерировать убыток. Модель требует радикального пересмотра.' 
-            : mode === 'good' 
-            ? `Окупаемость в ${Math.ceil(metrics.payback)} мес. при запасе прочности в ${metrics.safetyTraffic.toFixed(0)}%. Это сильная инвестиционная модель с маржинальностью EBITDA ${metrics.ebitdaPct.toFixed(0)}%.`
-            : mode === 'warn'
-            ? 'Модель прибыльна, но критически зависит от выполнения плана продаж. Проседание трафика более чем на 15% может обнулить прибыль.'
-            : 'Маржинальность слишком низкая для безопасной работы. Риск потери капитала превышает потенциальную доходность.'}
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center sm:justify-start gap-4">
-          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-2xl bg-black/40 font-mono text-sm font-black text-white border border-white/10 uppercase shadow-inner">
-            <span className="text-gray-500">Scoring:</span> {score} / 100
+
+      <div className="grid grid-cols-1 md:grid-cols-3 py-2">
+        <div className="flex flex-col gap-1 pr-8">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">Окупаемость</span>
+          <div className="text-[36px] font-mono font-black text-white leading-none">
+            {isFinite(payback) ? `${Math.ceil(payback)} мес` : '∞'}
           </div>
-          {mode === 'good' && (
-             <div className="inline-flex items-center gap-2 px-5 py-2 rounded-2xl bg-emerald-500/20 font-bold text-xs text-emerald-400 border border-emerald-500/30 uppercase">
-                Рекомендуем к реализации
-             </div>
-          )}
+        </div>
+        <div className="flex flex-col gap-1 px-8 border-y md:border-y-0 md:border-x border-white/5 py-4 md:py-0">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">Чистая / мес</span>
+          <div className={`text-[36px] font-mono font-black leading-none ${net > 0 ? 'text-teal' : 'text-red-500'}`}>
+            {net > 0 ? '+' : ''}{fmtShort(net)} ₸
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 pl-8 pt-4 md:pt-0">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">Запас прочности</span>
+          <div className={`text-[36px] font-mono font-black leading-none ${safety > 40 ? 'text-emerald-400' : safety > 15 ? 'text-amber-400' : 'text-red-500'}`}>
+            {safety.toFixed(0)}%
+          </div>
         </div>
       </div>
+
+      <p className="text-base text-[#b8b8c8] leading-relaxed border-t border-white/5 pt-6">
+        {getRecommendation()}
+      </p>
     </motion.div>
+  );
+}
+
+function ScoringSection({ score, metrics, pnl }: { score: number, metrics: any, pnl: PnLResult }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const getScoreDetails = () => {
+    const rentPct = metrics.rentPct;
+    const payback = metrics.payback;
+    const safetyTraffic = metrics.safetyTraffic;
+    const ebitdaPct = metrics.ebitdaPct;
+    const opLeverage = metrics.opLeverage;
+
+    let rentScore = 0; if (rentPct < 15) rentScore = 25; else if (rentPct < 25) rentScore = 15; else if (rentPct < 35) rentScore = 5;
+    let payScore = 0; if (payback < 18) payScore = 30; else if (payback < 36) payScore = 18; else if (payback < 60) payScore = 8;
+    let safeScore = 0; if (safetyTraffic > 40) safeScore = 20; else if (safetyTraffic > 15) safeScore = 12; else if (safetyTraffic > 0) safeScore = 5;
+    let ebitdaScore = 0; if (ebitdaPct > 20) ebitdaScore = 15; else if (ebitdaPct > 10) ebitdaScore = 10; else if (ebitdaPct > 0) ebitdaScore = 5;
+    let levScore = 0; if (opLeverage < 40) levScore = 10; else if (opLeverage < 60) levScore = 6; else levScore = 2;
+
+    return [
+      { label: 'Аренда / Выручка', val: `${rentPct.toFixed(1)}%`, score: rentScore, max: 25 },
+      { label: 'Окупаемость', val: isFinite(payback) ? `${payback.toFixed(0)} мес` : '∞', score: payScore, max: 30 },
+      { label: 'Запас прочности', val: `${safetyTraffic.toFixed(0)}%`, score: safeScore, max: 20 },
+      { label: 'Маржинальность EBITDA', val: `${ebitdaPct.toFixed(1)}%`, score: ebitdaScore, max: 15 },
+      { label: 'Операционный рычаг', val: `${opLeverage.toFixed(0)}%`, score: levScore, max: 10 },
+    ];
+  };
+
+  return (
+    <div className="bg-surface2/30 border border-white/5 rounded-2xl overflow-hidden">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">Скоринговая модель</span>
+          <div className="px-2 py-0.5 rounded-lg bg-black/40 font-mono text-[11px] font-bold text-white border border-white/10 uppercase">
+            {score} / 100
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-6 pb-6 pt-2"
+          >
+            <div className="space-y-3">
+              {getScoreDetails().map(item => (
+                <div key={item.label} className="flex justify-between items-center text-[12px]">
+                  <span className="text-gray-400 font-medium">{item.label}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="font-mono text-gray-500">{item.val}</span>
+                    <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden">
+                      <div className="h-full bg-teal" style={{ width: `${(item.score/item.max)*100}%` }} />
+                    </div>
+                    <span className="font-mono font-bold text-white w-10 text-right">{item.score} / {item.max}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -773,12 +929,12 @@ function PnLTable({ pnl, inputs, options }: any) {
     <div className="bg-surface border border-white/5 rounded-3xl p-8">
       <div className="mb-6">
         <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Отчёт о прибылях и убытках</h4>
-        <p className="text-[10px] text-gray-500 mt-1">Месячный плановый период</p>
+        <p className="text-[11px] text-gray-500 mt-1">Месячный плановый период</p>
       </div>
       <div className="space-y-4">
         <PnLRow label="Выручка" value={fmt(pnl.revenue)} highlight />
         <div className="pl-4 space-y-2">
-          <PnLRow label="− Себестоимость (COGS)" value={`−${fmt(pnl.cogs)}`} sub={`${inputs.cogsPct}%`} tertiary />
+          <PnLRow label="− Себестоимость" value={`−${fmt(pnl.cogs)}`} sub={`${inputs.cogsPct}%`} tertiary />
           <PnLRow label="− Эквайринг" value={`−${fmt(pnl.acq)}`} sub={`${inputs.acqPct}%`} tertiary />
           <PnLRow label="− Маркетинг" value={`−${fmt(pnl.mkt)}`} sub={`${inputs.mktPct}%`} tertiary />
         </div>
@@ -810,7 +966,7 @@ function PnLTable({ pnl, inputs, options }: any) {
             value={fmt(pnl.net)} 
             highlight 
             big 
-            color={pnl.net < 0 ? 'text-red-400' : 'text-teal'} 
+            color={pnl.net < 0 ? 'text-red-400' : 'text-emerald-400'} 
           />
         </div>
       </div>
@@ -823,103 +979,207 @@ function PnLRow({ label, value, sub, highlight, tertiary, big, color = 'text-whi
     <div className={`flex justify-between items-center text-xs ${highlight ? 'font-black' : 'font-medium'} ${tertiary ? 'text-gray-500' : ''}`}>
       <span className={tertiary ? 'text-gray-500' : 'text-gray-300'}>{label}</span>
       <div className="text-right flex items-center gap-3">
-        {sub && <span className="font-mono text-[9px] text-gray-600">{sub}</span>}
+        {sub && <span className="font-mono text-[12px] font-semibold text-gray-500">{sub}</span>}
         <span className={`font-mono ${color} ${big ? 'text-lg' : ''}`}>{value}</span>
       </div>
     </div>
   );
 }
 
-function SensitivityMatrix({ baseEbitda, check, clients, days, inputs, options }: any) {
-  const trafficLabels = ['Трафик +20%', 'План', 'Трафик −20%'];
-  const trafficMults = [1.2, 1.0, 0.8];
+function SensitivityMatrix({ baseEbitda, check, clients, days, inputs, options, setCheck, setClients }: any) {
+  const [yAxis, setYAxis] = useState('traffic');
+  const [hoveredCell, setHoveredCell] = useState<any>(null);
+  const [applyModal, setApplyModal] = useState<any>(null);
+
   const checkMults = [0.9, 1.0, 1.1];
   const checkLabels = ['Чек −10%', 'План', 'Чек +10%'];
 
-  const getCellData = (tm: number, cm: number) => {
-    const revenue = (check * cm) * (clients * tm) * days;
-    let rentPM2 = inputs.rentBase;
+  const getAxisConfig = () => {
+    switch (yAxis) {
+      case 'rent':
+        return {
+          labels: ['Аренда −10%', 'План', 'Аренда +10%', 'Аренда +20%'],
+          mults: [0.9, 1.0, 1.1, 1.2],
+          unit: '₸/мес'
+        };
+      case 'cogs':
+        return {
+          labels: ['Себ-ть −5%', 'План', 'Себ-ть +5%', 'Себ-ть +10%'],
+          mults: [0.95, 1.0, 1.05, 1.1],
+          unit: '%'
+        };
+      case 'fot':
+        return {
+          labels: ['ФОТ −15%', 'План', 'ФОТ +15%', 'ФОТ +30%'],
+          mults: [0.85, 1.0, 1.15, 1.3],
+          unit: '₸/мес'
+        };
+      default:
+        return {
+          labels: ['Трафик +20%', 'План', 'Трафик −20%', 'Трафик −35%'],
+          mults: [1.2, 1.0, 0.8, 0.65],
+          unit: 'чел/д'
+        };
+    }
+  };
+
+  const axis = getAxisConfig();
+
+  const getCellData = (ym: number, cm: number) => {
+    const curCheck = check * cm;
+    let curClients = clients;
+    let curRentBase = inputs.rentBase;
+    let curCogsPct = inputs.cogsPct;
+    let curFotTotal = (inputs.staff * inputs.salaryNet) * (options.taxFot ? 1.22 : 1);
+
+    if (yAxis === 'traffic') curClients = clients * ym;
+    else if (yAxis === 'rent') curRentBase = inputs.rentBase * ym;
+    else if (yAxis === 'cogs') curCogsPct = inputs.cogsPct * ym;
+    else if (yAxis === 'fot') curFotTotal = curFotTotal * ym;
+
+    const revenue = curCheck * curClients * days;
+    let rentPM2 = curRentBase;
     if (options.ore) rentPM2 += 2000;
     if (options.vat) rentPM2 *= 1.12;
     const rent = rentPM2 * inputs.area;
     const mallFee = options.mall ? revenue * 0.03 : 0;
-    const varTotal = revenue * ((inputs.cogsPct + inputs.acqPct + inputs.mktPct) / 100);
-    const fotTotal = (inputs.staff * inputs.salaryNet) * (options.taxFot ? 1.22 : 1);
-    const ebitda = revenue - varTotal - rent - mallFee - fotTotal;
+    const varTotal = revenue * ((curCogsPct + inputs.acqPct + inputs.mktPct) / 100);
+    const ebitda = revenue - varTotal - rent - mallFee - curFotTotal;
 
-    const isBase = tm === 1.0 && cm === 1.0;
+    const isBase = ym === 1.0 && cm === 1.0;
     const ratio = baseEbitda !== 0 ? ebitda / baseEbitda : 1;
+    const delta = baseEbitda !== 0 ? ((ebitda - baseEbitda) / Math.abs(baseEbitda) * 100) : 0;
     
     let bg = 'bg-surface2/50';
     let color = 'text-gray-300';
-    let labelColor = 'rgba(255,255,255,0.4)';
 
     if (ebitda < 0) {
-      bg = 'bg-red-500/10'; color = 'text-red-300';
-    } else if (ratio < 0.5) {
-      bg = 'bg-amber-500/20'; color = 'text-amber-300';
-    } else if (ratio < 0.85) {
-      bg = 'bg-amber-500/10'; color = 'text-amber-200';
-    } else if (ratio < 1.15) {
-      bg = 'bg-teal/10'; color = 'text-teal';
+      bg = 'bg-red-500/10'; color = 'text-red-400';
+    } else if (delta < -15) {
+      bg = 'bg-amber-500/10'; color = 'text-amber-400';
+    } else if (delta > 15) {
+      bg = 'bg-emerald-500/10'; color = 'text-emerald-400';
     } else {
-      bg = 'bg-emerald-500/15'; color = 'text-emerald-300';
+      bg = 'bg-teal/5'; color = 'text-teal';
     }
 
-    const delta = baseEbitda !== 0 ? ((ebitda - baseEbitda) / Math.abs(baseEbitda) * 100) : 0;
+    // Additional metrics for tooltip
+    const da = inputs.capex / 60;
+    const tax = options.taxMode === 'simple' ? revenue * 0.03 : Math.max(0, ebitda - da) * 0.2;
+    const net = ebitda - da - tax;
+    const payback = (inputs.capex + inputs.wc) / (net > 0 ? net : 0.000001);
 
-    return { val: fmtShort(ebitda), delta, color, bg, isBase };
+    return { val: fmtShort(ebitda), ebitda, net, payback, delta, color, bg, isBase, ym, cm };
   };
 
+  const allCells: any[] = [];
+  axis.mults.forEach(ym => {
+    checkMults.forEach(cm => {
+      allCells.push(getCellData(ym, cm));
+    });
+  });
+
+  const breakingPoint = allCells.find(c => c.ebitda < 0);
+
   return (
-    <div className="bg-surface border border-white/10 rounded-[32px] p-8 overflow-hidden">
-      <div className="flex justify-between items-start mb-8">
+    <div className="bg-surface border border-white/10 rounded-3xl p-8 overflow-visible relative">
+      <div className="flex flex-col lg:flex-row justify-between items-start gap-6 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-lg bg-teal/5 flex items-center justify-center border border-teal/10 text-teal">
               <Percent className="w-4 h-4" />
             </div>
-            <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Sensitivity Matrix</h4>
+            <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Матрица чувствительности</h4>
           </div>
-          <p className="text-[10px] text-gray-500">Ожидаемая EBITDA при отклонениях от плана</p>
+          <p className="text-[11px] text-gray-500">Ожидаемая EBITDA при отклонениях от плана</p>
         </div>
-        <div className="px-3 py-1 bg-surface2 border border-white/5 rounded-lg font-mono text-[10px] text-gray-400 uppercase">₸/мес</div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 bg-surface2 p-1 rounded-xl border border-white/5">
+            <LegendChip color="bg-emerald-500/20" text="EBITDA > плана на 15%+" />
+            <LegendChip color="bg-teal/10" text="План ±15%" />
+            <LegendChip color="bg-red-500/20" text="Убыток" />
+          </div>
+
+          <div className="relative group">
+            <button className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-[11px] font-bold uppercase tracking-widest text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-2">
+              <Plus className="w-3 h-3" /> Параметр Y
+            </button>
+            <div className="absolute top-full right-0 mt-2 w-48 bg-surface3 border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] p-1">
+              <AxisBtn active={yAxis === 'traffic'} onClick={() => setYAxis('traffic')}>Трафик ±35%</AxisBtn>
+              <AxisBtn active={yAxis === 'rent'} onClick={() => setYAxis('rent')}>Аренда ±20%</AxisBtn>
+              <AxisBtn active={yAxis === 'cogs'} onClick={() => setYAxis('cogs')}>Себ-ть ±10%</AxisBtn>
+              <AxisBtn active={yAxis === 'fot'} onClick={() => setYAxis('fot')}>ФОТ ±30%</AxisBtn>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="relative">
         <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-1">
+          <table className="w-full border-separate border-spacing-2">
             <thead>
               <tr>
-                <th className="w-24"></th>
+                <th className="w-32"></th>
                 {checkLabels.map((l) => (
-                  <th key={l} className="text-[9px] font-bold text-gray-600 uppercase tracking-widest pb-3 text-center">
+                   <th key={l} className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.14em] pb-3 text-center">
                     {l}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {trafficMults.map((tm, rowIdx) => (
-                <tr key={tm}>
-                  <td className="text-[9px] font-bold text-gray-500 uppercase tracking-widest pr-4 text-right align-middle leading-tight">
-                    {trafficLabels[rowIdx]}
+              {axis.mults.map((ym, rowIdx) => (
+                <tr key={ym}>
+                  <td className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.14em] pr-4 text-right align-middle leading-tight">
+                    {axis.labels[rowIdx]}
                   </td>
                   {checkMults.map((cm) => {
-                    const data = getCellData(tm, cm);
+                    const data = getCellData(ym, cm);
                     return (
                       <td 
                         key={cm} 
+                        onMouseEnter={() => setHoveredCell(data)}
+                        onMouseLeave={() => setHoveredCell(null)}
+                        onClick={() => !data.isBase && setApplyModal(data)}
+                        aria-label={`${axis.labels[rowIdx]} и ${checkLabels[checkMults.indexOf(cm)]}: EBITDA ${data.ebitda < 0 ? 'минус ' : ''}${fmtShort(Math.abs(data.ebitda))} тенге`}
                         className={`
                           ${data.bg} ${data.color}
-                          rounded-xl p-4 text-center transition-all duration-300
+                          rounded-2xl p-5 text-center cursor-pointer transition-all duration-300
+                          hover:scale-[1.03] hover:ring-2 hover:ring-teal relative
                           ${data.isBase ? 'ring-2 ring-teal ring-inset' : ''}
                         `}
                       >
-                        <div className="font-mono text-xs font-black tracking-tight">{data.val}</div>
-                        <div className="text-[8px] opacity-60 mt-1 font-bold">
-                          {data.isBase ? 'БАЗОВЫЙ' : `${data.delta > 0 ? '+' : ''}${data.delta.toFixed(0)}%`}
+                        <div className="font-mono text-base font-black tracking-tight">{data.val}</div>
+                        <div className="text-[11px] opacity-70 mt-1 font-bold">
+                          {data.isBase ? 'ПЛАН' : `${data.delta > 0 ? '+' : ''}${data.delta.toFixed(0)}%`}
                         </div>
+                        
+                        <AnimatePresence>
+                          {hoveredCell === data && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-surface3 border border-white/10 p-3 rounded-xl shadow-2xl z-[110] pointer-events-none w-48 text-left"
+                            >
+                              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 border-b border-white/5 pb-2">Детали сценария</div>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="text-gray-400">Δ EBITDA</span>
+                                  <span className={data.delta >= 0 ? 'text-emerald-400' : 'text-red-400'}>{data.delta > 0 ? '+' : ''}{data.delta.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="text-gray-400">Чистая</span>
+                                  <span className="text-white font-mono">{fmtShort(data.net)}</span>
+                                </div>
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="text-gray-400">Окупаем.</span>
+                                  <span className="text-white font-mono">{isFinite(data.payback) ? `${Math.ceil(data.payback)}м` : '∞'}</span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </td>
                     );
                   })}
@@ -929,7 +1189,89 @@ function SensitivityMatrix({ baseEbitda, check, clients, days, inputs, options }
           </table>
         </div>
       </div>
+
+      <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-3 text-[12px]">
+          <div className={`p-1.5 rounded-lg ${breakingPoint ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+            <AlertCircle className="w-4 h-4" />
+          </div>
+          <p className="text-gray-400 font-medium">
+            {breakingPoint ? (
+              <>Точка перелома: <span className="text-white font-bold">{axis.labels[axis.mults.indexOf(breakingPoint.ym)]}</span> И <span className="text-white font-bold">{checkLabels[checkMults.indexOf(breakingPoint.cm)]}</span> → убыток <span className="text-red-400 font-bold">{breakingPoint.val}/мес</span></>
+            ) : (
+              `Модель устойчива даже к падению ${yAxis === 'traffic' ? 'трафика' : 'параметров'} на ${Math.abs((axis.mults[axis.mults.length-1]-1)*100).toFixed(0)}%. Это редкость.`
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Apply Modal */}
+      <AnimatePresence>
+        {applyModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-surface2 border border-white/10 p-8 rounded-3xl shadow-2xl max-w-sm w-full"
+            >
+              <h4 className="text-lg font-black mb-2 text-white">Применить сценарий?</h4>
+              <p className="text-sm text-gray-400 mb-6">Это обновит параметры трафика и среднего чека в форме ввода. Вы сможете вернуться к плану, выбрав пресет заново.</p>
+              
+              <div className="bg-black/20 rounded-2xl p-4 mb-8 space-y-2 border border-white/5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Трафик будет:</span>
+                  <span className="text-white font-bold">{(clients * applyModal.ym).toFixed(0)} чел/д</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Чек будет:</span>
+                  <span className="text-white font-bold">{fmt(check * applyModal.cm)} ₸</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setApplyModal(null)}
+                  className="px-6 py-3 rounded-xl bg-white/5 text-white font-bold text-xs hover:bg-white/10 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button 
+                  onClick={() => {
+                    if (yAxis === 'traffic') setClients(clients * applyModal.ym);
+                    setCheck(check * applyModal.cm);
+                    setApplyModal(null);
+                  }}
+                  className="px-6 py-3 rounded-xl bg-teal text-black font-bold text-xs hover:scale-105 transition-transform"
+                >
+                  Применить
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function LegendChip({ color, text }: { color: string, text: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1">
+      <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{text}</span>
+    </div>
+  );
+}
+
+function AxisBtn({ children, active, onClick }: any) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full text-left px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors rounded-lg ${active ? 'bg-teal/10 text-teal' : 'text-gray-500 hover:bg-white/5 hover:text-white'}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -944,7 +1286,7 @@ function BreakEvenCard({ metrics, pnl, check, clients, days }: any) {
           </div>
           <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Точка безубыточности</h4>
         </div>
-        <div className="px-3 py-1 rounded-full bg-teal/10 border border-teal/20 text-teal font-mono text-[10px] font-bold">
+        <div className={`px-3 py-1 rounded-lg font-mono text-[11px] font-bold border ${safety > 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
           Запас: {safety > 0 ? `+${safety.toFixed(0)}%` : 'КРИТИЧНО'}
         </div>
       </div>
@@ -964,13 +1306,13 @@ function BreakEvenCard({ metrics, pnl, check, clients, days }: any) {
           percentage={(metrics.beCheck / check) * 100}
         />
         <div className="pt-6 border-t border-white/5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-purple/5 flex items-center justify-center border border-purple/10">
-            <Wallet className="w-5 h-5 text-purple" />
+          <div className="w-10 h-10 rounded-lg bg-teal/5 flex items-center justify-center border border-teal/10">
+            <Wallet className="w-5 h-5 text-teal" />
           </div>
           <div>
-            <div className="text-[11px] font-black tracking-tight text-white uppercase">Operating Leverage: {metrics.opLeverage.toFixed(0)}%</div>
-            <p className="text-[10px] text-gray-500 mt-1">
-              {metrics.opLeverage < 40 ? 'Гибкая модель: низкие фикс-расходы.' : metrics.opLeverage < 60 ? 'Средняя устойчивость к колебаниям.' : 'Высокий риск: фикс-затраты доминируют.'}
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-white">Операционный рычаг: {metrics.opLeverage.toFixed(0)}%</div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              {metrics.opLeverage < 40 ? 'Гибкая модель: низкая доля постоянных расходов.' : metrics.opLeverage < 60 ? 'Средняя устойчивость к колебаниям.' : 'Высокий риск: постоянные расходы доминируют.'}
             </p>
           </div>
         </div>
@@ -986,8 +1328,8 @@ function BreakEvenRow({ icon, label, value, current, percentage }: any) {
       <div className="flex items-center gap-3">
         <div className="text-gray-500">{icon}</div>
         <div className="flex-1">
-          <div className="text-[11px] font-bold tracking-tight">{label}: <span className="font-mono text-white text-xs">{value}</span></div>
-          <div className="text-[9px] text-gray-600">План: {current}</div>
+          <div className="text-[11px] font-bold tracking-tight">{label}: <span className="font-mono text-white text-[12px] font-semibold">{value}</span></div>
+          <div className="text-[11px] text-gray-500">План: {current}</div>
         </div>
       </div>
       <div className="h-1.5 w-full bg-surface2 rounded-full relative overflow-hidden">
@@ -1014,12 +1356,12 @@ function InterpretationsList({ metrics, pnl }: any) {
   else if (metrics.fotPct > 25) points.push({ type: 'warn', text: `ФОТ ${metrics.fotPct.toFixed(0)}% — на верхней границе нормы.` });
 
   if (pnl.ebitda <= 0) points.push({ type: 'bad', text: `EBITDA отрицательная. Операционная модель не работает.` });
-  else if (metrics.safetyTraffic < 15) points.push({ type: 'bad', text: `Margin of Safety ${metrics.safetyTraffic.toFixed(0)}% — крайне мало.` });
+  else if (metrics.safetyTraffic < 15) points.push({ type: 'bad', text: `Запас прочности ${metrics.safetyTraffic.toFixed(0)}% — крайне мало.` });
   
   if (isFinite(metrics.payback) && metrics.payback > 36) points.push({ type: 'bad', text: `Окупаемость ${Math.ceil(metrics.payback)} мес — рискованно долго.` });
   else if (isFinite(metrics.payback) && metrics.payback <= 18) points.push({ type: 'good', text: `Окупаемость ${Math.ceil(metrics.payback)} мес — это быстро.` });
 
-  if (metrics.opLeverage > 60) points.push({ type: 'warn', text: `Высокий operating leverage (${metrics.opLeverage.toFixed(0)}%). Падение выручки ударит по EBITDA сильнее.` });
+  if (metrics.opLeverage > 60) points.push({ type: 'warn', text: `Высокий операционный рычаг (${metrics.opLeverage.toFixed(0)}%). Падение выручки ударит по EBITDA сильнее.` });
 
   return (
     <div className="space-y-2">
@@ -1035,50 +1377,12 @@ function InterpretationsList({ metrics, pnl }: any) {
 
 // --- New V3 Components ---
 
-function GaugeCard({ score }: { score: number }) {
-  const r = 80;
-  const cx = 100, cy = 100;
-  const startAngle = 180;
-  const endAngle = 180 + (score / 100) * 180;
 
-  const polar = (angle: number) => {
-    const rad = angle * Math.PI / 180;
-    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
-  };
-
-  const [vEx, vEy] = polar(endAngle);
-  const largeArc = (endAngle - 180) > 180 ? 1 : 0;
-  const valPath = `M ${cx - r} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${vEx} ${vEy}`;
-
-  let color = '#ef4444';
-  let zoneText = 'Высокий риск';
-  if (score >= 70) { color = '#10b981'; zoneText = 'Устойчиво'; }
-  else if (score >= 45) { color = '#f59e0b'; zoneText = 'Пограничная'; }
-
-  return (
-    <div className="bg-surface border border-white/5 rounded-[32px] p-6 flex flex-col items-center justify-center relative overflow-hidden backdrop-blur-sm shadow-xl">
-      <svg className="w-full max-w-[180px] block" viewBox="0 0 200 130">
-        <defs>
-          <linearGradient id="gauge-grad" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="#ef4444"/>
-            <stop offset="45%" stopColor="#f59e0b"/>
-            <stop offset="70%" stopColor="#10b981"/>
-          </linearGradient>
-        </defs>
-        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="14" strokeLinecap="round"/>
-        <path d={valPath} fill="none" stroke="url(#gauge-grad)" strokeWidth="14" strokeLinecap="round"/>
-        <text x={cx} y={96} textAnchor="middle" fill="white" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 32 }}>{score}</text>
-        <text x={cx} y={115} textAnchor="middle" fill={color} style={{ fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em' }}>{zoneText.toUpperCase()}</text>
-      </svg>
-      <div className="mt-2 text-[9px] font-bold uppercase tracking-[0.2em] text-gray-500">Score · 0–100</div>
-    </div>
-  );
-}
 
 function WaterfallCard({ pnl }: { pnl: PnLResult }) {
   const steps = [
     { label: 'Выручка', value: pnl.revenue, type: 'total' },
-    { label: 'COGS', value: -pnl.cogs, type: 'neg' },
+    { label: 'Себестоимость', value: -pnl.cogs, type: 'neg' },
     { label: 'Эквайринг', value: -pnl.acq, type: 'neg' },
     { label: 'Маркетинг', value: -pnl.mkt, type: 'neg' },
     { label: 'Аренда', value: -(pnl.rent + pnl.mallFee), type: 'neg' },
@@ -1114,19 +1418,19 @@ function WaterfallCard({ pnl }: { pnl: PnLResult }) {
   const yScale = (v: number) => padT + (maxVal - v) / range * plotH;
 
   return (
-    <div className="bg-surface border border-white/5 rounded-[32px] p-8 overflow-hidden shadow-sm">
+    <div className="bg-surface border border-white/5 rounded-3xl p-8 overflow-hidden shadow-sm">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Водопад прибыли</h4>
-          <p className="text-[10px] text-gray-500 mt-1">От выручки к операционной прибыли</p>
+          <p className="text-[11px] text-gray-500 mt-1">От выручки к операционной прибыли</p>
         </div>
-        <div className="px-3 py-1 bg-surface2 border border-white/5 rounded-lg font-mono text-[10px] text-gray-400">₸/мес</div>
+        <div className="px-3 py-1 bg-surface2 border border-white/5 rounded-lg font-mono text-[11px] text-gray-500">₸/мес</div>
       </div>
       <svg className="w-full block" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id="wf-grad-pos" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(0,196,170,0.6)"/>
-            <stop offset="100%" stopColor="rgba(0,196,170,0.3)"/>
+            <stop offset="0%" stopColor="rgba(16,185,129,0.6)"/>
+            <stop offset="100%" stopColor="rgba(16,185,129,0.3)"/>
           </linearGradient>
         </defs>
         <line x1={padX} y1={yScale(0)} x2={W - padX} y2={yScale(0)} stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
@@ -1136,12 +1440,12 @@ function WaterfallCard({ pnl }: { pnl: PnLResult }) {
           const yBot = yScale(Math.min(b.y0, b.y1));
           const h = Math.max(2, yBot - yTop);
           const color = (b.type === 'total' || b.type === 'total-pos') ? 'url(#wf-grad-pos)' : 'rgba(239,68,68,0.4)';
-          const labelColor = (b.type === 'total' || b.type === 'total-pos') ? '#6ee7d4' : '#fca5a5';
+          const labelColor = (b.type === 'total' || b.type === 'total-pos') ? '#34d399' : '#fca5a5';
           return (
             <g key={i}>
-              <rect x={x} y={yTop} width={barW} height={h} fill={color} stroke={(b.type === 'total' || b.type === 'total-pos') ? 'rgba(0,196,170,0.6)' : 'rgba(239,68,68,0.6)'} strokeWidth="1" rx="4" />
-              <text x={x + barW/2} y={b.value >= 0 ? yTop - 8 : yBot + 14} textAnchor="middle" fill={labelColor} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700 }}>{fmtShort(Math.abs(b.value))}</text>
-              <text x={x + barW/2} y={H - padB + 24} textAnchor="middle" fill="rgba(255,255,255,0.4)" style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>{b.label}</text>
+              <rect x={x} y={yTop} width={barW} height={h} fill={color} stroke={(b.type === 'total' || b.type === 'total-pos') ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'} strokeWidth="1" rx="4" />
+              <text x={x + barW/2} y={b.value >= 0 ? yTop - 10 : yBot + 16} textAnchor="middle" fill={labelColor} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>{fmtShort(Math.abs(b.value))}</text>
+              <text x={x + barW/2} y={H - padB + 24} textAnchor="middle" fill="rgba(255,255,255,0.4)" style={{ fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em' }}>{b.label}</text>
             </g>
           );
         })}
@@ -1187,23 +1491,23 @@ function CashFlowCard({ pnl, capex, wc, rampUp }: { pnl: PnLResult, capex: numbe
   const linePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xScale(d.m)} ${yScale(d.v)}`).join(' ');
 
   return (
-    <div className="bg-surface border border-white/5 rounded-[32px] p-8 shadow-sm">
+    <div className="bg-surface border border-white/5 rounded-3xl p-8 shadow-sm">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Накопленный доход</h4>
-          <p className="text-[10px] text-gray-500 mt-1">График выхода на окупаемость за 36 месяцев</p>
+          <p className="text-[11px] text-gray-500 mt-1">График выхода на окупаемость за 36 месяцев</p>
         </div>
-        <div className="px-3 py-1 bg-surface2 border border-white/5 rounded-lg font-mono text-[10px] text-gray-400 text-right uppercase">₸ накопл.</div>
+        <div className="px-3 py-1 bg-surface2 border border-white/5 rounded-lg font-mono text-[11px] font-semibold text-gray-500 text-right uppercase">₸ накопл.</div>
       </div>
       <svg className="w-full block" viewBox={`0 0 ${W} ${H}`}>
         <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-        <path d={areaPath} fill={maxV > 0 ? 'rgba(0,196,170,0.1)' : 'rgba(239,68,68,0.1)'} stroke="none" />
+        <path d={areaPath} fill={maxV > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'} stroke="none" />
         <path d={linePath} fill="none" stroke="#00c4aa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {[0, 12, 24, 36].map(m => (
-          <text key={m} x={xScale(m)} y={H - padB + 20} textAnchor="middle" fill="rgba(255,255,255,0.3)" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700 }}>{m === 0 ? 'старт' : `${m}м`}</text>
+          <text key={m} x={xScale(m)} y={H - padB + 20} textAnchor="middle" fill="rgba(255,255,255,0.3)" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>{m === 0 ? 'старт' : `${m}м`}</text>
         ))}
-        <text x={padL - 10} y={yScale(maxV)} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize="10">{fmtShort(maxV)}</text>
-        <text x={padL - 10} y={yScale(minV)} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize="10">{fmtShort(minV)}</text>
+        <text x={padL - 10} y={yScale(maxV)} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize="11" fontWeight="600" fontFamily="var(--font-mono)">{fmtShort(maxV)}</text>
+        <text x={padL - 10} y={yScale(minV)} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize="11" fontWeight="600" fontFamily="var(--font-mono)">{fmtShort(minV)}</text>
       </svg>
     </div>
   );
@@ -1223,12 +1527,12 @@ function SafetyBars({ inputs, metrics, pnl, options }: any) {
   ];
 
   return (
-    <div className="bg-surface border border-white/5 rounded-[32px] p-8 shadow-sm">
+    <div className="bg-surface border border-white/5 rounded-3xl p-8 shadow-sm">
       <div className="flex items-center gap-3 mb-10">
         <div className="w-8 h-8 rounded-lg bg-teal/5 flex items-center justify-center border border-teal/10 text-teal">
           <Scale className="w-4 h-4" />
         </div>
-        <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Запас прочности (Margin of Safety)</h4>
+        <h4 className="text-sm font-black uppercase tracking-widest text-gray-300">Запас прочности</h4>
       </div>
       <div className="space-y-12">
         {rows.map(r => {
@@ -1239,14 +1543,14 @@ function SafetyBars({ inputs, metrics, pnl, options }: any) {
           return (
             <div key={r.name} className="relative">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">{r.name}</span>
-                <span className={`text-[12px] font-mono font-black ${isSafe ? 'text-teal' : 'text-red-400'}`}>
+                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">{r.name}</span>
+                <span className={`text-[12px] font-mono font-black ${isSafe ? 'text-emerald-400' : 'text-red-400'}`}>
                   {r.unit === '₸' ? fmtShort(r.plan) : r.plan.toFixed(r.unit==='%'?1:0)} {r.unit}
                 </span>
               </div>
-              <div className="h-4 bg-surface2 rounded-full relative overflow-visible border border-white/5">
+              <div className="h-4 bg-surface2 rounded-lg relative overflow-visible border border-white/5">
                 <div 
-                  className="h-full absolute left-0 top-0 opacity-10 rounded-full"
+                  className="h-full absolute left-0 top-0 opacity-10 rounded-lg"
                   style={{ 
                     width: '100%',
                     background: r.better === 'more' 
@@ -1257,10 +1561,10 @@ function SafetyBars({ inputs, metrics, pnl, options }: any) {
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(100, Math.max(0, planPos))}%` }}
-                  className="h-full bg-white/10 relative z-10 rounded-full"
+                  className="h-full bg-white/10 relative z-10 rounded-lg"
                 />
-                <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white z-20 shadow-lg" style={{ left: `${bePos}%` }}>
-                  <div className="absolute top-[-18px] left-1/2 -translate-x-1/2 text-[8px] font-black text-white bg-surface3 px-1.5 py-0.5 rounded border border-white/10 whitespace-nowrap">
+                <div className="absolute top-[-2px] bottom-[-2px] w-0.5 bg-white z-20 shadow-lg" style={{ left: `${bePos}%` }}>
+                  <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 text-[11px] font-bold text-white bg-surface3 px-2 py-0.5 rounded-lg border border-white/10 whitespace-nowrap shadow-xl">
                     BE: {r.unit === '₸' ? fmtShort(r.be) : r.be.toFixed(1)}
                   </div>
                 </div>
@@ -1284,7 +1588,7 @@ function BenchmarksCard({ segment, metrics }: { segment: string, metrics: any })
   ];
 
   return (
-    <div className="bg-surface border border-white/5 rounded-[32px] p-8 shadow-sm">
+    <div className="bg-surface border border-white/5 rounded-3xl p-8 shadow-sm">
       <div className="flex items-center gap-3 mb-10">
         <div className="w-8 h-8 rounded-lg bg-teal/5 flex items-center justify-center border border-teal/10 text-teal">
           <TrendingUp className="w-4 h-4" />
@@ -1301,27 +1605,27 @@ function BenchmarksCard({ segment, metrics }: { segment: string, metrics: any })
           return (
             <div key={r.label}>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-[11px] font-bold text-gray-500 uppercase">{r.label}</span>
-                <span className="text-xs font-black font-mono text-white">{r.label==='Payback'? (isFinite(r.value) ? Math.ceil(r.value) : '∞'): r.value.toFixed(1)}{r.label!=='Payback'?'%':' мес'}</span>
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.14em]">{r.label}</span>
+                <span className="text-[12px] font-black font-mono text-white">{r.label==='Payback'? (isFinite(r.value) ? Math.ceil(r.value) : '∞'): r.value.toFixed(1)}{r.label!=='Payback'?'%':' мес'}</span>
               </div>
-              <div className="h-6 rounded-xl bg-surface2 relative overflow-hidden border border-white/5">
+              <div className="h-6 rounded-lg bg-surface2 relative overflow-hidden border border-white/5">
                 <div className="absolute inset-0 opacity-20" style={{ 
                   background: r.better === 'more' 
                     ? `linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%)`
                     : `linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%)`
                 }} />
                 <div className="absolute w-0.5 h-full bg-white opacity-30 z-10" style={{ left: `${getP(med)}%` }} />
-                <div className="absolute w-0.5 h-full bg-teal opacity-50 z-10" style={{ left: `${getP(top)}%` }} />
+                <div className="absolute w-0.5 h-full bg-emerald-400 opacity-50 z-10" style={{ left: `${getP(top)}%` }} />
                 <motion.div 
                   initial={{ left: 0 }}
                   animate={{ left: `${getP(r.value)}%` }}
                   className="absolute w-3 h-3 bg-white rounded-full shadow-xl border-2 border-teal z-20 top-1/2 -translate-y-1/2 -translate-x-1/2" 
                 />
               </div>
-              <div className="flex justify-between mt-1.5 opacity-30 font-mono text-[7px] uppercase tracking-wider">
+              <div className="flex justify-between mt-2 opacity-40 font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
                 <span>Хуже рынка</span>
                 <span className="text-white opacity-100">Медиана</span>
-                <span className="text-teal opacity-100">Топ-25%</span>
+                <span className="text-emerald-400 opacity-100">Топ-25%</span>
               </div>
             </div>
           );

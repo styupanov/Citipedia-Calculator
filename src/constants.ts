@@ -97,7 +97,7 @@ export const PRESETS: Record<string, Preset> = {
     capex: 35000000,
     capexRange: [20000000, 80000000],
     wc: 5000000,
-    meta: 'food cost 32–42% · чек 8.5k'
+    meta: 'себестоимость 32–42% · чек 8.5k'
   },
   barber: {
     name: 'Барбершоп',
@@ -197,7 +197,7 @@ export const PRESETS: Record<string, Preset> = {
     capex: 15000000,
     capexRange: [8000000, 30000000],
     wc: 12000000,
-    meta: 'оборотка 40%+ от CAPEX'
+    meta: 'оборотка 40%+ от вложений'
   },
   fitness: {
     name: 'Студия фитнеса',
@@ -222,7 +222,7 @@ export const PRESETS: Record<string, Preset> = {
     capex: 25000000,
     capexRange: [12000000, 50000000],
     wc: 3000000,
-    meta: 'абонементы · низкая COGS'
+    meta: 'абонементы · низкая себестоимость'
   }
 };
 
